@@ -1,0 +1,7 @@
+streamlit
+pandas
+numpy==1.26.4
+faiss-cpu
+sentence-transformers
+transformers
+torch
