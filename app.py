@@ -3,30 +3,24 @@ import numpy as np
 import pandas as pd
 import faiss
 from sentence_transformers import SentenceTransformer
-from transformers import pipeline
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
+
+st.title("🧠 Autism RAG Chatbot")
 
 # =========================
-# APP TITLE
-# =========================
-st.title("🧠 Autism RAG Chatbot (LLM Powered)")
-
-# =========================
-# LOAD MODELS (SAFE)
+# LOAD MODELS
 # =========================
 @st.cache_resource
 def load_models():
     embed_model = SentenceTransformer('all-MiniLM-L6-v2')
 
-    # FIX: use text-generation (most compatible on cloud)
-    generator = pipeline(
-        "text-generation",
-        model="distilgpt2",
-        max_length=200
-    )
+    tokenizer = AutoTokenizer.from_pretrained("distilgpt2")
+    model = AutoModelForCausalLM.from_pretrained("distilgpt2")
 
-    return embed_model, generator
+    return embed_model, tokenizer, model
 
-embed_model, generator = load_models()
+embed_model, tokenizer, llm_model = load_models()
 
 # =========================
 # LOAD DATA
@@ -42,18 +36,16 @@ def load_data():
     docs = []
 
     for _, row in df.iterrows():
-        text = f"""
-        Child age: {row['Age_Mons']} months
-        Eye contact issues: {yes_no(row['A2'])}
-        Social interaction issues: {yes_no(row['A3'])}
-        Repetitive behavior: {yes_no(row['A4'])}
-        Autism score: {row['Qchat-10-Score']}
-        Family history: {row['Family_mem_with_ASD']}
-        Result: {row['Class/ASD Traits']}
-        """
-        docs.append(text)
+        docs.append(f"""
+Child age: {row['Age_Mons']} months
+Eye contact issues: {yes_no(row['A2'])}
+Social interaction issues: {yes_no(row['A3'])}
+Repetitive behavior: {yes_no(row['A4'])}
+Autism score: {row['Qchat-10-Score']}
+Family history: {row['Family_mem_with_ASD']}
+Result: {row['Class/ASD Traits']}
+""")
 
-    # Add general autism knowledge
     docs.extend([
         "Autism is a neurodevelopmental condition affecting communication.",
         "Early signs include delayed speech and poor eye contact.",
@@ -66,22 +58,19 @@ def load_data():
 docs = load_data()
 
 # =========================
-# BUILD FAISS INDEX
+# BUILD INDEX
 # =========================
 @st.cache_resource
 def build_index(docs):
     embeddings = embed_model.encode(docs)
-    dim = embeddings.shape[1]
-
-    index = faiss.IndexFlatL2(dim)
+    index = faiss.IndexFlatL2(embeddings.shape[1])
     index.add(np.array(embeddings))
-
     return index
 
 index = build_index(docs)
 
 # =========================
-# RETRIEVAL FUNCTION
+# RETRIEVE
 # =========================
 def retrieve(query, k=3):
     q_emb = embed_model.encode([query])
@@ -89,17 +78,31 @@ def retrieve(query, k=3):
     return [docs[i] for i in idx[0]]
 
 # =========================
-# CHATBOT (RAG)
+# GENERATE RESPONSE
+# =========================
+def generate_text(prompt):
+    inputs = tokenizer(prompt, return_tensors="pt", truncation=True)
+    
+    outputs = llm_model.generate(
+        **inputs,
+        max_length=150,
+        do_sample=True,
+        temperature=0.7
+    )
+    
+    return tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+# =========================
+# CHATBOT
 # =========================
 def chatbot(query):
-
     if "autism" not in query.lower():
-        return "⚠️ Please ask only autism-related questions."
+        return "⚠️ Ask autism-related questions only."
 
     context = "\n".join(retrieve(query))
 
     prompt = f"""
-You are a helpful autism assistant.
+You are an autism expert assistant.
 
 Context:
 {context}
@@ -107,18 +110,16 @@ Context:
 Question:
 {query}
 
-Answer in simple terms:
+Answer clearly:
 """
 
-    result = generator(prompt, max_length=200, do_sample=True)
-    return result[0]['generated_text']
+    return generate_text(prompt)
 
 # =========================
 # UI
 # =========================
-user_input = st.text_input("💬 Ask a question about autism:")
+user_input = st.text_input("💬 Ask about autism:")
 
 if user_input:
-    response = chatbot(user_input)
     st.write("### 🧠 Answer")
-    st.write(response)
+    st.write(chatbot(user_input))
