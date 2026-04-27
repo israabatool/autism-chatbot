@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-st.title("🧠 Autism Chatbot (Stable Cloud Version)")
+st.title("🧠 Autism Chatbot (Cloud Stable)")
 
 # =========================
 # LOAD DATA
@@ -21,7 +21,7 @@ def load_data():
     for _, row in df.iterrows():
         docs.append(f"""
 Age: {row['Age_Mons']} months
-Eye contact issues: {yn(row['A2'])}
+Eye contact: {yn(row['A2'])}
 Social issues: {yn(row['A3'])}
 Repetitive behavior: {yn(row['A4'])}
 Score: {row['Qchat-10-Score']}
@@ -31,7 +31,7 @@ Result: {row['Class/ASD Traits']}
     docs.extend([
         "Autism is a neurodevelopmental condition.",
         "Early signs include delayed speech and poor eye contact.",
-        "Autism varies in severity.",
+        "Autism spectrum disorder varies in severity.",
         "Therapies include speech and behavioral therapy.",
         "Early diagnosis improves outcomes."
     ])
@@ -41,7 +41,7 @@ Result: {row['Class/ASD Traits']}
 docs = load_data()
 
 # =========================
-# TF-IDF (LIGHTWEIGHT)
+# SIMPLE SEARCH (NO FAISS)
 # =========================
 vectorizer = TfidfVectorizer()
 doc_vectors = vectorizer.fit_transform(docs)
@@ -49,15 +49,15 @@ doc_vectors = vectorizer.fit_transform(docs)
 def retrieve(query, k=3):
     q_vec = vectorizer.transform([query])
     sims = cosine_similarity(q_vec, doc_vectors).flatten()
-    top_idx = sims.argsort()[-k:][::-1]
-    return [docs[i] for i in top_idx]
+    top = sims.argsort()[-k:][::-1]
+    return [docs[i] for i in top]
 
 # =========================
 # CHATBOT
 # =========================
 def chatbot(query):
     if "autism" not in query.lower():
-        return "Please ask autism-related questions."
+        return "⚠️ Please ask autism-related questions."
 
     context = "\n".join(retrieve(query))
 
@@ -72,7 +72,7 @@ def chatbot(query):
 # =========================
 # UI
 # =========================
-q = st.text_input("Ask about autism:")
+query = st.text_input("Ask about autism:")
 
-if q:
-    st.write(chatbot(q))
+if query:
+    st.write(chatbot(query))
