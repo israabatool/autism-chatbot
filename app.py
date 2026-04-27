@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-st.title("🧠 Autism Chatbot (Cloud Stable)")
+st.title("🧠 Autism Chatbot (Stable Deployment)")
 
 # =========================
 # LOAD DATA
@@ -21,7 +21,7 @@ def load_data():
     for _, row in df.iterrows():
         docs.append(f"""
 Age: {row['Age_Mons']} months
-Eye contact: {yn(row['A2'])}
+Eye contact issues: {yn(row['A2'])}
 Social issues: {yn(row['A3'])}
 Repetitive behavior: {yn(row['A4'])}
 Score: {row['Qchat-10-Score']}
@@ -29,7 +29,7 @@ Result: {row['Class/ASD Traits']}
 """)
 
     docs.extend([
-        "Autism is a neurodevelopmental condition.",
+        "Autism is a neurodevelopmental condition affecting communication.",
         "Early signs include delayed speech and poor eye contact.",
         "Autism spectrum disorder varies in severity.",
         "Therapies include speech and behavioral therapy.",
@@ -41,7 +41,7 @@ Result: {row['Class/ASD Traits']}
 docs = load_data()
 
 # =========================
-# SIMPLE SEARCH (NO FAISS)
+# VECTOR SEARCH (NO FAISS)
 # =========================
 vectorizer = TfidfVectorizer()
 doc_vectors = vectorizer.fit_transform(docs)
@@ -49,8 +49,8 @@ doc_vectors = vectorizer.fit_transform(docs)
 def retrieve(query, k=3):
     q_vec = vectorizer.transform([query])
     sims = cosine_similarity(q_vec, doc_vectors).flatten()
-    top = sims.argsort()[-k:][::-1]
-    return [docs[i] for i in top]
+    top_idx = sims.argsort()[-k:][::-1]
+    return [docs[i] for i in top_idx]
 
 # =========================
 # CHATBOT
@@ -72,7 +72,7 @@ def chatbot(query):
 # =========================
 # UI
 # =========================
-query = st.text_input("Ask about autism:")
+q = st.text_input("Ask about autism:")
 
-if query:
-    st.write(chatbot(query))
+if q:
+    st.write(chatbot(q))
